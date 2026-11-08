@@ -1,0 +1,42 @@
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+.ipynb_checkpoints/
+
+# Büyük veya indirilebilir dosyalar (kurulum adımları: README.md)
+# data: maç videoları, models: ağırlıklar ve TensorRT motorları,
+# outputs: üretilen çıktılar, third_party: NBJW kaynak kodu (git clone ile alınır, GPL-2.0)
+data/
+models/
+outputs/
+third_party/
+*.pt
+*.pth
+*.onnx
+*.engine
+*.mp4
+*.avi
+*.mov
+*.npz
+
+# Gizli bilgiler
+.env
+.env.*
+*.key
+
+# Office geçici dosyaları
+~$*
+
+# IDE / işletim sistemi
+.vscode/
+.idea/
+.claude/
+Thumbs.db
+Desktop.ini
+.DS_Store

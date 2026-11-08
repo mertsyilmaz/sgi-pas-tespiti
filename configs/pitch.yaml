@@ -1,0 +1,5 @@
+# Saha modeli (docs/04_PITCH_GRID.md §1)
+# Koordinat sistemi: orijin = uzak taç çizgisi (yayın kamerasının karşısı) ile sol kale çizgisinin köşesi.
+# x: sol kale çizgisinden sağa [0, length], y: uzak taç çizgisinden yayın tarafına [0, width]. Birim: metre.
+length: 105.0
+width: 68.0

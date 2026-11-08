@@ -1,0 +1,6 @@
+# 50 hücreli ızgara (D-004, docs/04_PITCH_GRID.md §2). Hücre sayısı izinsiz değiştirilemez.
+# cell_id = col * n_rows + (n_rows - 1 - row) + 1  ->  1..50 (D-038: sol alt köşeden başlar, sütun sütun alttan yukarı)
+# Aralıklar yarı açıktır [min, max); yalnızca en sağ ve en alt sınır kapalıdır.
+x_edges: [0.0, 10.5, 21.0, 31.5, 42.0, 52.5, 63.0, 73.5, 84.0, 94.5, 105.0]   # 10 sütun
+y_edges: [0.0, 13.6, 27.2, 40.8, 54.4, 68.0]                                  # 5 satır
+out_tolerance_m: 0.5   # saha çizgisinin bu kadar dışı hâlâ sahada sayılır (homografi hatası payı)

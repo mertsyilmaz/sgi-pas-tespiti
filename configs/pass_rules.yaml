@@ -1,0 +1,38 @@
+# Pas kuralları (docs/05_PASS_RULES.md, D-006, D-008, D-009). Kurallar yalnızca burada ve src/sgi/rules/ içindedir.
+version: 1.0
+labels: [SUCCESS, FAIL]
+
+target_cell_rules:
+  exclude_passer: true
+  exclude_roles: [referee]
+  include_goalkeepers: true
+  neighbor_cells: false          # yalnızca hedef hücre (Q15)
+  out_of_pitch: FAIL             # R-OUT
+  tie_epsilon_m: 0.3
+  tie_result: SUCCESS            # R-3T
+  outcomes:
+    only_teammates: SUCCESS      # R-1
+    only_opponents: FAIL         # R-2
+    both: nearest_to_ball        # R-3
+    none: FAIL                   # R-4
+
+intermediate_cells:
+  evaluate: false                # R-0: yalnızca kaydedilir
+
+fallbacks:
+  max_ball_gap_frames: 15        # F-1 (<=: doğrusal doldurma) / F-2 (>: son görülen konumda biter)
+
+pass_definition:
+  every_kick_is_pass: true       # D-009
+  same_player_regain_is_dribble: true
+
+# Gözlem katmanı (M6) parametreleri: kural değil, ölçüm eşikleri (05 §A.1, §A.2)
+possession:
+  radius_m: 1.5                  # top oyuncuya bu kadar yakınsa "dibinde"
+  min_frames: 3                  # art arda bu kadar kare dibinde kalan oyuncu topun sahibi olur
+  roles: [player, goalkeeper]    # hakem sahip olamaz
+pass_end:
+  stop_speed_mps: 1.5            # top bundan yavaşsa "durdu / yavaşladı" sayılır
+  stop_frames: 10                # bu kadar kare yavaş ve sahipsiz kalırsa pas biter (05 §A.2 koşul 2)
+  speed_window_frames: 5         # hız bu kadar karelik konum farkından hesaplanır
+  max_ball_speed_mps: 40.0       # bundan hızlı "pas" ölçüm sıçramasıdır (en sert şutlar ~35 m/sn), kaydedilmez

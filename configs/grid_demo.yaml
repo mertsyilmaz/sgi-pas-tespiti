@@ -1,0 +1,112 @@
+# Faz 0 demosu: videoda 50 hücreli ızgaranın gösterimi (D-013)
+
+pitch_keypoint_detector:
+  type: nbjw                      # registry anahtarı (D-011)
+  repo_dir: third_party/nbjw
+  weights_kp: models/nbjw/SV_FT_TSWC_kp      # TS-WorldCup ince ayarlı (D-024); eski: SV_kp
+  weights_lines: models/nbjw/SV_FT_TSWC_lines
+  kp_threshold: 0.1486            # NBJW varsayılanları
+  line_threshold: 0.3880
+  device: cuda                    # cuda | cpu
+  half: true                      # fp16 çıkarım (4 GB GPU için hız/bellek)
+  trt_engine: models/trt/nbjw_kp_fp16.engine   # TensorRT (scripts/build_trt.py): 108 -> 47 ms; dosya yoksa PyTorch (D-036)
+  use_lines: false                # çizgi ağı: nokta sayısına katkısı ~%1, GPU süresinin yarısı (D-031)
+  channels_last: false            # true: ~%5-10 hız, ama sonuçlar birebir tekrarlanamaz (D-015)
+
+objects:                          # oyuncu / hakem / kaleci / top (D-022). Kapatmak için enabled: false
+  enabled: true
+  detector:
+    type: ultralytics_yolo
+    # roboflow/sports futbol modeli (MIT, YOLOv8x): top/kaleci/oyuncu/hakem ayrı sınıf (D-024)
+    weights: models/roboflow_sports/football-player-detection.pt
+    class_map: {0: ball, 1: goalkeeper, 2: player, 3: referee}
+    # eski (COCO, rol yok): weights: models/yolo/yolo11l.pt, class_map: {0: person, 32: ball}
+    imgsz: 1280
+    trt_engine: models/trt/football-player-detection_1280_fp16.engine   # 80 -> 63 ms; yoksa .pt (D-036)
+    conf: 0.40
+    ball_conf: 0.15
+  tracker:
+    type: botsort                   # BoT-SORT: ByteTrack + kamera hareketi telafisi (D-024)
+    lost_track_buffer: 50
+    new_track_thresh: 0.5           # kısa ömürlü (titreşen) takipleri azaltır
+  team_assigner:
+    type: color_kmeans
+    min_samples: 150                # ilk kümelemeden önce toplanacak forma örneği
+    refit_every: 100
+    outlier_factor: 2.5             # iki takım rengine de bu kadar uzak = hakem/kaleci
+    history: 20                     # takip başına son N oy (kimlik değişiminde etiket hızlı düzelsin)
+  ball_tracker:                     # top takibi, yalnızca geçmiş kareler (D-028)
+    possess_m: 1.5                  # top son görüldüğünde oyuncuya bu kadar yakınsa kaybolunca oyuncuda sayılır
+    hold_max_s: 3.0                 # oyuncuda sayma süresi sınırı
+    predict_max_s: 0.5              # sahipsiz kaybolan topun son hızla ilerletileceği süre
+    max_speed_mps: 35.0             # takip kapısı: top bu hızdan hızlı gidemez
+    mark_radius_m: 1.5              # penaltı/orta noktadaki sahte "top" eleme yarıçapı (kalibrasyon hatası payı ~1 m)
+    mark_player_m: 1.0              # işaretteki aday ancak dibinde (bu mesafede) oyuncu varsa top sayılır
+    static_s: 1.2                   # oyuncusuz (static_player_m) bu kadar kıpırdamayan "top" saha işaretidir, öğrenilir (D-032)
+    static_r_m: 1.0
+    static_player_m: 2.0
+    learned_r_m: 2.0                # öğrenilen işaret çevresinde eleme yarıçapı
+    learned_ttl_s: 20.0             # bu süre yeniden görülmeyen öğrenilmiş işaret unutulur
+    hold_back_max_s: 8.0            # hold_max_s dolunca sahibin sırtı kameraya dönükse (poz) bu süreye kadar uzar (D-035)
+    pose_every: 5                   # uzatma sırasında yöne kaç karede bir yeniden bakılır
+  pose:                             # oyuncu yönü (D-035); yalnızca hold_max_s dolunca, tek oyuncunun kırpıntısında
+    enabled: true
+    type: ultralytics_pose
+    weights: models/yolo/yolo11m-pose.pt
+    imgsz: 256
+  pitch_margin_m: 3.0               # ayak noktası sahadan bu kadar dışarıdaysa kişi atılır (seyirci, yedek)
+
+camera_motion:
+  type: lk_flow                   # kareler arası kamera hareketi (F-3, D-012)
+  max_width: 640                  # akış hesabı için küçültme
+  max_corners: 600
+  min_inliers: 40
+  cut_hist_dist: 0.35             # sahne kesmesi: ardışık kare renk histogramı uzaklığı (D-033)
+
+homography:
+  min_keypoints: 4
+  ransac_threshold_m: 1.0         # RANSAC eşiği (saha metresi)
+  max_reproj_error_m: 1.5         # ortalama inlier hatası üst sınırı
+  min_spread_m: 8.0               # noktaların sahada en az bu kadar yayılması (dejenere çözümü engeller)
+  camera_check: true              # homografi gerçek bir kameradan gelebilir mi (odak, en-boy, yükseklik), D-017
+  min_inliers: 8                  # 4-7 noktalı çözümler yanlış olabiliyor; doğru ölçümler >= 8 inlier (D-017)
+
+pitch_refiner:                    # çizgilere oturtma (D-020); kapatmak için enabled: false
+  type: line_fit
+  enabled: true
+  every: 1                        # process: her kare (~40 ms). Canlı modda live_every kullanılır
+  live_every: 1                   # canlı: ayrı süreçte, boşaldıkça en güncel kare (D-029)
+  live:                           # canlıya özel: alt süreçte her kareye yetişmesi için (~45 -> ? ms)
+    fast_mask: true
+    max_nfev: 25
+  max_correction_m: 4.0           # daha büyük düzeltme reddedilir (paralel çizgiye yanlış oturmayı önler)
+  min_gain: 0.03                  # çizgi uyumu en az bu kadar artmalı
+
+quality:                          # kalite göstergeleri (D-019); teşhis amaçlı, her karede gerekmez
+  every: 5                        # kaç karede bir ölçülsün (ölçüm ~15 ms)
+
+tracking:                         # homografi zaman takibi (F-3)
+  detect_every: 1                 # keypoint modeli kaç karede bir çalışsın (arada kamera hareketi kullanılır)
+  measurement_weight: 0.35        # ölçüm/tahmin karışımı (1 = yalnızca ölçüm, yumuşatma yok)
+  max_jump_m: 4.0                 # ölçüm ile tahmin bu kadar farklıysa ölçüm şüpheli
+  strong_measurement_inliers: 10  # bu kadar inlier'lı ölçüm, şüpheli olsa da kabul edilir (yeniden sabitleme)
+  max_motion_chain: 75            # keypoint görmeden en fazla kaç kare taşınır
+
+live:                             # canlı mod (D-016, D-022)
+  calib_every: 10                 # saha noktası modeli en fazla kaç karede bir; arada kamera hareketi + çizgilere oturtma
+  smooth_objects: true            # nesne kutularını sonuçlar arasında optik akış/hızla ilerlet (D-030, yalnızca gösterim)
+
+bootstrap:                        # ızgara yokken az noktadan (>= 3) + çizgilerden fiziksel kamera kestirimi (D-034)
+  enabled: true
+  min_points: 3
+  min_line_score: 0.85            # kabul: izdüşen saha çizgilerinin beyaz çizgiye oturma oranı
+  min_iou: 0.85                   # kabul: saha poligonu / çim örtüşmesi
+  max_point_px: 12.0              # kabul: bulunan noktalara ortanca hata
+  min_gap: 5                      # en fazla kaç karede bir denenir (~0,5–1 sn CPU)
+
+camera_prior:                     # sabit kamera konumu önseli (D-027)
+  enabled: true
+  min_samples: 8                  # en az bu kadar güvenilir kareden sonra devreye girer
+  max_spread_m: 6.0               # kestirimlerin yayılımı bundan büyükse (farklı kameralar) öncel kapalı
+  min_points: 3
+  max_rms_px: 4.0

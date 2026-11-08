@@ -1,0 +1,10 @@
+# Python 3.12, Windows + NVIDIA (CUDA 12.6 tekerlekleri)
+# PyTorch ayrı kurulur:
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu126
+numpy
+opencv-python
+scipy
+pyyaml
+pytest
+ultralytics
+gdown
